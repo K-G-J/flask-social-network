@@ -1,6 +1,7 @@
 # FLASK SOCIAL NETWORK APP
 
 ## Description
+An example of a social network app built in Python where you can register, login, view your or another user's posts, and follow/unfollow other users.
 
 ## Installation
 

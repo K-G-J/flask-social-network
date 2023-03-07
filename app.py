@@ -1,4 +1,4 @@
-from flask import (Flask, g, render_template, flash, redirect, url_for)
+from flask import (Flask, g, render_template, flash, redirect, url_for, abort)
 from flask_bcrypt import check_password_hash
 from flask_login import (LoginManager, login_user, logout_user,
                          login_required, current_user)
@@ -118,9 +118,14 @@ def stream(username=None):
     template = 'stream.html'
     # if username different than user in route render stream for that user
     if username and username != current_user.username:
-        # find username is 'like' not case sensitive
-        user = models.User.select().where(models.User.username**username).get()
-        stream = user.posts.limit(100)
+        try:
+            # find username is 'like' not case sensitive
+            user = models.User.select().where(models.User.username**username).get()
+        except models.DoesNotExist:
+            # abort with error 404
+            abort(404)
+        else:
+            stream = user.posts.limit(100)
     # render stream for current user
     else:
         stream = current_user.get_stream().limit(100)
@@ -131,22 +136,31 @@ def stream(username=None):
     return render_template(template, stream=stream, user=user)
 
 
+@app.route('/post/<int:post_id>')
+def view_post(post_id):
+    posts = models.Post.select().where(models.Post.id == post_id)
+    if posts.count() == 0:
+        # abort if the post does not exist
+        abort(404)
+    return render_template('stream.html', stream=posts)
+
+
 @app.route('/follow/<username>')
 @login_required
 def follow(username):
     try:
         to_user = models.User.get(models.User.username**username)
     except models.DoesNotExist:
-        pass
+        abort(404)
     else:
         try:
             models.Relationship.create(
                 from_user=g.user._get_current_object(),
                 to_user=to_user
             )
-        # cannot follow user twice
+        # cannot unfollow user twice
         except models.IntegrityError:
-            pass
+            abort(404)
         else:
             flash(f"You're now following {to_user.username}!", 'success')
     return redirect(url_for('stream', username=to_user.username))
@@ -171,6 +185,13 @@ def unfollow(username):
         else:
             flash(f"You've unfollowed {to_user.username}!", 'success')
     return redirect(url_for('stream', username=to_user.username))
+
+
+# renders view anytime a 404 is triggered
+@app.errorhandler(404)
+def not_found(error):
+    # send back 404 status code
+    return render_template('404.html'), 404
 
 
 if __name__ == '__main__':

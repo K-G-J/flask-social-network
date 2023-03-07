@@ -25,6 +25,8 @@ class User(UserMixin, Model):
 
     def get_stream(self):
         return Post.select().where(
+            # find all posts where the user is inside of the people user is following or where posts belong to user
+            (Post.user << self.following()) |
             (Post.user == self)
         )
 
