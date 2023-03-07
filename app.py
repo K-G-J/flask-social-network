@@ -1,7 +1,7 @@
 from flask import (Flask, g, render_template, flash, redirect, url_for)
 from flask_bcrypt import check_password_hash
 from flask_login import (LoginManager, login_user, logout_user,
-                         login_required)
+                         login_required, current_user)
 
 import forms
 import models
@@ -36,6 +36,8 @@ def before_request():
     g.db = models.DATABASE
     # connect to database before every request
     g.db.connect()
+    # find current user
+    g.user = current_user
 
 
 @app.after_request
@@ -91,9 +93,42 @@ def logout():
     return redirect(url_for('index'))
 
 
+@app.route('/new_post', methods=['GET', 'POST'])
+@login_required
+def post():
+    form = forms.PostForm()
+    if form.validate_on_submit():
+        # get the global user
+        models.Post.create(user=g.user._get_current_object(),
+                           content=form.content.data.strip())
+        flash('Message posted! Thanks!', 'success')
+        return redirect(url_for('index'))
+    return render_template('post.html', form=form)
+
+
 @app.route('/')
 def index():
-    return 'Hey'
+    stream = models.Post.select().limit(100)
+    return render_template('stream.html', stream=stream)
+
+
+@app.route('/stream')
+@app.route('/stream/<username>')
+def stream(username=None):
+    template = 'stream.html'
+    # if username different than user in route render stream for that user
+    if username and username != current_user.username:
+        # find username is 'like' not case sensitive
+        user = models.User.select().where(models.User.username**username).get()
+        stream = user.posts.limit(100)
+    # render stream for current user
+    else:
+        stream = current_user.get_stream().limit(100)
+        user = current_user
+    # regardless, if username, set template to a user stream
+    if username:
+        template = 'user_stream.html'
+    return render_template(template, stream=stream, user=user)
 
 
 if __name__ == '__main__':
