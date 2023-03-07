@@ -24,7 +24,31 @@ class User(UserMixin, Model):
         return Post.select().where(Post.user == self)
 
     def get_stream(self):
-        return Post.select().where((Post.user == self))
+        return Post.select().where(
+            (Post.user == self)
+        )
+
+    def following(self):
+        """The users that we are following."""
+        return (
+            # select all the relationships to user where from_user is self
+            User.select().join(
+                Relationship, on=Relationship.to_user
+            ).where(
+                Relationship.from_user == self
+            )
+        )
+
+    def followers(self):
+        """Get users following the current user."""
+        return (
+            # select all the relationships where to_user is self
+            User.select().join(
+                Relationship, on=Relationship.from_user
+            ).where(
+                Relationship.to_user == self
+            )
+        )
 
     # describes method that belongs to a class that can create the class it belongs to (cls = class), creates class instance before calling method
     @classmethod
@@ -56,7 +80,21 @@ class Post(Model):
         order_by = ('-timestamp',)
 
 
+class Relationship(Model):
+    # current user following
+    from_user = ForeignKeyField(User, related_name='relationships')
+    # users who follow current user
+    to_user = ForeignKeyField(User, related_name='related_to')
+
+    class Meta:
+        database = DATABASE
+        # unique index
+        indexes = (
+            (('from_user', 'to_user'), True),
+        )
+
+
 def initialize():
     DATABASE.connect()
-    DATABASE.create_tables([User, Post], safe=True)
+    DATABASE.create_tables([User, Post, Relationship], safe=True)
     DATABASE.close()
