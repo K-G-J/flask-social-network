@@ -14,6 +14,8 @@
 - flask
 - flask-login
 - flask-bcrypt
+- flask-wtf
+- wtforms
 - peewee
 - datetime
 - Sqlite
